@@ -1,11 +1,17 @@
-...
+import logging
+import os
+from http import HTTPStatus
+import requests
+
+from dotenv import load_dotenv
+from telebot import TeleBot, types
 
 load_dotenv()
 
 
-PRACTICUM_TOKEN = ...
-TELEGRAM_TOKEN = ...
-TELEGRAM_CHAT_ID = ...
+PRACTICUM_TOKEN = 'y0_AgAAAAAmDp17AAYckQAAAAEMJfqSAABj6XWH_LdKlqPkabI7cV0_h196Tw'
+TELEGRAM_TOKEN = '7212266124:AAF5Acq-DFpsKmWdRuB0NVYdojjJAvDVuKk'
+TELEGRAM_CHAT_ID = 420664455
 
 RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
@@ -20,7 +26,10 @@ HOMEWORK_VERDICTS = {
 
 
 def check_tokens():
-    ...
+    tokens = [PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID]
+    if not all(tokens):
+        logging.critical('Не хватает токенов')
+        raise Exception('Не хватает токенов')
 
 
 def send_message(bot, message):
@@ -28,7 +37,17 @@ def send_message(bot, message):
 
 
 def get_api_answer(timestamp):
-    ...
+    try:
+        responce = requests.get(
+            ENDPOINT,
+            headers=HEADERS,
+            params={'from_date': timestamp}
+        )
+        if responce.status_code != HTTPStatus.OK:
+            raise Exception('В запросе переданы некорректные данные')
+        return responce.json()
+    except requests.RequestException() as error:
+        raise Exception(error)
 
 
 def check_response(response):
