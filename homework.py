@@ -9,9 +9,9 @@ from telebot import TeleBot, types
 load_dotenv()
 
 
-PRACTICUM_TOKEN = 'y0_AgAAAAAmDp17AAYckQAAAAEMJfqSAABj6XWH_LdKlqPkabI7cV0_h196Tw'
-TELEGRAM_TOKEN = '7212266124:AAF5Acq-DFpsKmWdRuB0NVYdojjJAvDVuKk'
-TELEGRAM_CHAT_ID = 420664455
+PRACTICUM_TOKEN = ''
+TELEGRAM_TOKEN = ''
+TELEGRAM_CHAT_ID = 
 
 RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
