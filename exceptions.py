@@ -9,7 +9,7 @@ class SendingError(Exception):
 
 
 class ConnectionError(Exception):
-    """Не верный код ответа."""
+    """Ошибка запроса."""
     pass
 
 
