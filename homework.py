@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 import time
 from http import HTTPStatus
 
@@ -27,45 +28,64 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler()
+logger.addHandler(handler)
+formatter = logging.Formatter(
+    '%(asctime)s - %(levelname)s - %(message)s'
+)
+handler.setFormatter(formatter)
+
 
 def check_tokens():
     """Проверка доступности переменных окружения."""
-    if not PRACTICUM_TOKEN:
-        logging.critical('Нет PRACTICUM_TOKEN')
-        raise exceptions.TokenError('Нет PRACTICUM_TOKEN')
-
-    if not TELEGRAM_TOKEN:
-        logging.critical('Нет TELEGRAM_TOKEN')
-        raise exceptions.TokenError('Нет TELEGRAM_TOKEN')
-
-    if not TELEGRAM_CHAT_ID:
-        logging.critical('Нет TELEGRAM_CHAT_ID')
-        raise exceptions.TokenError('Нет TELEGRAM_CHAT_ID')
+    tokens = (
+        (PRACTICUM_TOKEN, 'PRACTICUM_TOKEN'),
+        (TELEGRAM_TOKEN, 'TELEGRAM_TOKEN'),
+        (TELEGRAM_CHAT_ID, 'TELEGRAM_CHAT_ID')
+    )
+    all_tokens = True
+    missing_tokens = []
+    for token, token_name in tokens:
+        if not token:
+            all_tokens = False
+            missing_tokens.append(token_name)
+    if not all_tokens:
+        return missing_tokens
 
 
 def send_message(bot, message):
     """Отправление сообщений в чат."""
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
-        logging.debug('Сообщение отправлено.')
     except (telebot.apihelper.ApiException,
             requests.RequestException) as error:
         logging.error(f'Сообщение не отправлено: {error}')
-        raise exceptions.SendingError('Сообщение не отправлено')
+        raise exceptions.SendingError(f'Сообщение не отправлено: {error}')
     else:
-        logging.info('Сообщение отправляется.')
+        logging.debug('Сообщение отправлено.')
 
 
 def get_api_answer(timestamp):
     """Запрос к API-сервису."""
+    params_request = {
+        'url': ENDPOINT,
+        'headers': HEADERS,
+        'params': {'from_date': timestamp},
+    }
     try:
         response = requests.get(
             ENDPOINT,
             headers=HEADERS,
             params={'from_date': timestamp}
         )
-    except requests.RequestException as error:
-        raise exceptions.ConnectionError(error)
+    except requests.RequestException:
+        raise exceptions.ConnectionError(
+            'Неверный код ответа. Параметры запроса: url = {url},'
+            'headers = {headers},'
+            'params = {params}'.format(**params_request)
+        )
     if response.status_code != HTTPStatus.OK:
         raise exceptions.ResponseStatusError('Не удалось сделать запрос')
     return response.json()
@@ -97,10 +117,13 @@ def parse_status(homework):
 
 def main():
     """Основная логика работы бота."""
-    check_tokens()
+    if check_tokens():
+        logging.critical('Отсутствуют токены:', check_tokens())
+        sys.exit()
     bot = telebot.TeleBot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     status = ''
+    last_message = ''
     while True:
         try:
             response = get_api_answer(timestamp)
@@ -108,19 +131,24 @@ def main():
             homeworks = response.get('homeworks')
             if not homeworks:
                 logging.debug('Нет новых работ.')
+                send_message(bot, 'Нет новых работ')
             else:
                 homework = homeworks[0]
-                if status == homework.get('status'):
+                new_status = parse_status(homework)
+                if status == new_status:
                     logging.debug('Статус не изменен.')
                 else:
                     message = parse_status(homework)
-                    send_message(bot, message)
-                    status = homework.get('status')
-                    timestamp = response.get('current_date', timestamp)
+                    if send_message(bot, message):
+                        status = homework.get('status')
+                        timestamp = response.get('current_date', timestamp)
+                    else:
+                        logging.error('Сообщение не отправлено')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            send_message(bot, message)
-            logging.error(message)
+            if last_message != message:
+                send_message(bot, message)
+                logging.error(message)
         finally:
             time.sleep(RETRY_PERIOD)
 
@@ -132,13 +160,4 @@ if __name__ == '__main__':
         filemode='w',
         format='%(asctime)s, %(levelname)s, %(message)s'
     )
-
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.DEBUG)
-    handler = logging.StreamHandler()
-    logger.addHandler(handler)
-    formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s'
-    )
-    handler.setFormatter(formatter)
     main()
