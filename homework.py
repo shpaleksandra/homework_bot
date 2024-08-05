@@ -45,14 +45,11 @@ def check_tokens():
         (TELEGRAM_TOKEN, 'TELEGRAM_TOKEN'),
         (TELEGRAM_CHAT_ID, 'TELEGRAM_CHAT_ID')
     )
-    all_tokens = True
     missing_tokens = []
     for token, token_name in tokens:
         if not token:
-            all_tokens = False
             missing_tokens.append(token_name)
-    if not all_tokens:
-        return missing_tokens
+    return missing_tokens
 
 
 def send_message(bot, message):
@@ -130,24 +127,20 @@ def main():
             check_response(response)
             homeworks = response.get('homeworks')
             if not homeworks:
-                logging.debug('Нет новых работ.')
+                logger.info('Нет новых работ')
                 send_message(bot, 'Нет новых работ')
             else:
-                homework = homeworks[0]
-                new_status = parse_status(homework)
-                if status == new_status:
-                    logging.debug('Статус не изменен.')
+                message = parse_status(homeworks[0])
+                if message != status:
+                    send_message(bot, message)
+                    status = message
                 else:
-                    message = parse_status(homework)
-                    if send_message(bot, message):
-                        status = homework.get('status')
-                        timestamp = response.get('current_date', timestamp)
-                    else:
-                        logging.error('Сообщение не отправлено')
+                    logger.info('Статус не изменен.')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             if last_message != message:
                 send_message(bot, message)
+                last_message = message
                 logging.error(message)
         finally:
             time.sleep(RETRY_PERIOD)
