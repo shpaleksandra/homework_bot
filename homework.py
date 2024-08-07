@@ -119,7 +119,6 @@ def main():
         sys.exit()
     bot = telebot.TeleBot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
-    status = ''
     last_message = ''
     while True:
         try:
@@ -127,21 +126,21 @@ def main():
             check_response(response)
             homeworks = response.get('homeworks')
             if not homeworks:
-                logger.info('Нет новых работ')
-                send_message(bot, 'Нет новых работ')
+                message = 'Нет новых работ'
+                logger.info(message)
             else:
                 message = parse_status(homeworks[0])
-                if message != status:
-                    send_message(bot, message)
-                    status = message
-                else:
-                    logger.info('Статус не изменен.')
+            if message != last_message:
+                send_message(bot, message)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
+            logging.error(message)
             if last_message != message:
                 send_message(bot, message)
                 last_message = message
-                logging.error(message)
+        else:
+            last_message = message
+            timestamp = response.get('current_date', timestamp)
         finally:
             time.sleep(RETRY_PERIOD)
 
